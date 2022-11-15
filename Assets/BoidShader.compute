@@ -1,0 +1,53 @@
+#pragma kernel CSMain
+
+struct Boid
+{
+    float3 position;
+    float3 velocity;
+};
+RWStructuredBuffer<Boid> boids;
+float N;
+float NMinusOne;
+float deltaTime;
+float minDistSqr;
+float centerForce;
+float flockAmount;
+float goalAmount;
+float3 goalPos;
+
+[numthreads(4,4,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    int myID = id.x + id.y * 8;
+    float3 myPos = boids[myID].position;
+    float3 myVel = boids[myID].velocity;
+    float3 pcj = float3(0,0,0);
+    float3 pvj = float3(0,0,0);
+    float3 ruleOne;
+    float3 ruleTwo = float3(0,0,0);
+    float3 ruleThree;
+    for(int i = 0; i < N; i++)
+    {
+        if(i != myID)
+        {
+            float3 bPos = boids[i].position;
+            pcj += bPos;
+            pvj += boids[i].velocity;
+            float xDiff = myPos.x-bPos.x;
+            float yDiff = myPos.y-bPos.y;
+            float zDiff = myPos.z-bPos.z;
+            float distSqr = xDiff*xDiff + yDiff*yDiff + zDiff*zDiff;
+            if(distSqr < minDistSqr)
+            {
+                ruleTwo -= (bPos - myPos);
+            }
+        }
+    }
+    pcj = pcj / NMinusOne;
+    pvj = pvj / NMinusOne;
+    ruleOne = (pcj - myPos) / centerForce;
+    ruleThree = (pvj - myVel) / flockAmount;
+    float ruleFour = (goalPos - myPos) * goalAmount;
+    boids[myID].velocity += (ruleOne + ruleTwo + ruleThree + ruleFour) * deltaTime;
+    boids[myID].position = myPos + boids[myID].velocity;
+}
